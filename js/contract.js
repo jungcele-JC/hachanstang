@@ -1,7 +1,11 @@
 // ============================================================
-// 하찮상 공통 규격 v1  (2026-10-18)
+// 하찮상 공통 규격 v2  (2026-10-18)
 // 3명이 합의한 인터페이스입니다. 바꾸고 싶으면 3명 모두 동의한 뒤
 // C가 수정하고 버전을 올립니다. 다른 사람은 이 파일을 건드리지 않습니다.
+//
+// 변경 이력
+//   v2  generateBadge에 선택 인자 category 추가 (A 요청). 화면에서 카테고리를 먼저 고르는 흐름 지원.
+//   v1  최초 합의
 // ============================================================
 
 /** @typedef {"food"|"clean"|"digital"|"move"|"social"|"rest"|"work"|"etc"} Category */
@@ -41,8 +45,10 @@ export function todayStr(d = new Date()) {
 // 각 모듈이 반드시 export해야 하는 함수 (이름·시그니처 고정)
 // ------------------------------------------------------------
 // js/badge-engine.js  (B 담당)
-//   generateBadge(deed: string, date?: string): Badge
-//     - 동기. 같은 deed+date → 항상 같은 결과 (결정적). 어떤 입력에도 반드시 뱃지를 반환.
+//   generateBadge(deed: string, date?: string, category?: Category): Badge
+//     - 동기. 같은 deed+date+category → 항상 같은 결과 (결정적). 어떤 입력에도 반드시 뱃지를 반환.
+//     - category가 오면 그 카테고리 안에서만 뱃지를 찾고, 결과의 category도 그 값이어야 함.
+//       category가 없거나(undefined) CATEGORIES에 없는 값이면 지금처럼 엔진이 문장에서 추측.
 //   renderBadgeSVG(badge: Badge, size?: number): string
 //     - <svg …> 문자열. 기본 size 240. 외부 리소스(폰트/이미지 URL) 사용 금지.
 //

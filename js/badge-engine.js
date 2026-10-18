@@ -14,9 +14,10 @@ const PALETTE = {
   move:    { bg: "#FDE8EC", fg: "#5A0F1F", accent: "#E0485E" },
 };
 
-export function generateBadge(deed, date = todayStr()) {
+export function generateBadge(deed, date = todayStr(), category) {
   const h = [...(deed + date)].reduce((a, c) => a + c.codePointAt(0), 0);
-  const s = SAMPLES[h % SAMPLES.length];
+  const pool = SAMPLES.filter((x) => x.category === category);
+  const s = pool.length ? pool[h % pool.length] : SAMPLES[h % SAMPLES.length];
   return { id: crypto.randomUUID(), date, deed, ...s, palette: PALETTE[s.category], createdAt: new Date().toISOString() };
 }
 
