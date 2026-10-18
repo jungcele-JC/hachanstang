@@ -1,6 +1,9 @@
 // js/app.js - A 소유. 화면 상태(입력/수여/컬렉션)와 이벤트.
 // 다른 모듈은 contract.js에 적힌 export 이름만 믿고 쓴다.
-import { generateBadge, renderBadgeSVG } from "./badge-engine.js";
+import * as engine from "./badge-engine.js";
+const { generateBadge, renderBadgeSVG } = engine;
+// suggestDeeds는 규격 v3에서 들어올 예정. 아직 없으면 추천 UI를 통째로 숨긴다.
+const suggestDeeds = typeof engine.suggestDeeds === "function" ? engine.suggestDeeds : null;
 import { saveBadge, listBadges, deleteBadge, getStats, exportJSON, importJSON } from "./storage.js";
 import { badgeToPNG } from "./share.js";
 import { CATEGORIES, CATEGORY_LABEL, RARITY_LABEL, todayStr } from "./contract.js";
@@ -96,7 +99,44 @@ function selectCategory(cat, { keepFocus = false } = {}) {
   state.category = cat;
   document.querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-checked", String(c.dataset.cat === cat)));
   updateSubmit();
+  hideSuggestions();
   if (!keepFocus && !$("#deed").value) $("#deed").focus({ preventScroll: true });
+}
+
+// ---- 추천 문장 (엔진 사전에서 뽑음. suggestDeeds가 있을 때만 동작)
+function hideSuggestions() {
+  $("#suggest-list").hidden = true;
+  $("#suggest-list").innerHTML = "";
+  $("#suggest").hidden = !(suggestDeeds && state.category);
+}
+
+function showSuggestions() {
+  if (!suggestDeeds || !state.category) return;
+  let list = [];
+  try { list = suggestDeeds(state.category, 3) ?? []; } catch (err) { console.error(err); }
+  const box = $("#suggest-list");
+  box.innerHTML = "";
+  if (!list.length) { toast("추천할 문장이 아직 없어요"); return; }
+  for (const text of list) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "suggest-chip";
+    b.textContent = text;
+    b.addEventListener("click", () => {
+      $("#deed").value = text;
+      updateSubmit();
+      hideSuggestions();
+      $("#submit-btn").focus();
+    });
+    box.appendChild(b);
+  }
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "suggest-chip more";
+  more.textContent = "다른 거";
+  more.addEventListener("click", showSuggestions);
+  box.appendChild(more);
+  box.hidden = false;
 }
 
 function updateSubmit() {
@@ -123,6 +163,7 @@ function rotatePlaceholder() {
 
 function renderHome() {
   updateSubmit();
+  hideSuggestions();
   const mine = listBadges().filter((b) => b.date === todayStr());
   $("#today").hidden = mine.length === 0;
   $("#today-list").innerHTML = mine
@@ -134,8 +175,7 @@ function onSubmit(e) {
   e.preventDefault();
   const deed = $("#deed").value.trim();
   if (!state.category || !deed) { updateSubmit(); return; }
-  // 세 번째 인자 category는 규격 v1에 없어서 지금 mock은 무시한다.
-  // 규격에 들어오면 엔진이 고른 카테고리 안에서만 뱃지를 찾게 된다.
+  // 규격 v2: 고른 카테고리를 넘기면 엔진이 그 안에서만 뱃지를 찾는다.
   state.pending = generateBadge(deed, undefined, state.category);
   state.saved = false;
   $("#deed-form").reset();
@@ -302,6 +342,7 @@ function init() {
   buildChips();
   rotatePlaceholder();
   $("#deed").addEventListener("input", updateSubmit);
+  $("#suggest-btn").addEventListener("click", showSuggestions);
   $("#deed-form").addEventListener("submit", onSubmit);
   $("#save-btn").addEventListener("click", onSave);
   $("#image-btn").addEventListener("click", onImage);

@@ -110,6 +110,17 @@ button, input { font: inherit; color: inherit; }
 #deed::placeholder { color: var(--muted); }
 .hint { margin: 8px 2px 0; font-size: .85rem; color: var(--muted); }
 
+/* 추천 문장 */
+.suggest { margin-top: 6px; }
+.btn-small { min-height: 40px; padding: 6px 10px; font-size: .9rem; }
+.suggest-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.suggest-chip {
+  min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 2px solid var(--line);
+  background: var(--surface); font-weight: 700; cursor: pointer; font-size: .9rem;
+}
+.suggest-chip:hover { border-color: var(--fg); }
+.suggest-chip.more { background: transparent; color: var(--muted); }
+
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 44px; padding: 10px 18px; border-radius: 14px; border: 2px solid var(--line);

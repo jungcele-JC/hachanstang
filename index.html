@@ -31,6 +31,11 @@
             <input id="deed" name="deed" type="text" maxlength="200" autocomplete="off" enterkeyhint="done" placeholder="사과 먹음" />
           </div>
           <p id="deed-hint" class="hint" aria-live="polite">카테고리를 먼저 골라 주세요.</p>
+          <!-- 추천: 엔진이 suggestDeeds를 export할 때만 보인다 (규격 v3 예정) -->
+          <div id="suggest" class="suggest" hidden>
+            <button id="suggest-btn" class="btn btn-ghost btn-small" type="button">뭐 적을지 모르겠어요</button>
+            <div id="suggest-list" class="suggest-list" role="group" aria-label="추천 문장" hidden></div>
+          </div>
         </div>
 
         <button id="submit-btn" class="btn btn-primary btn-big" type="submit" disabled>업적 받기</button>
