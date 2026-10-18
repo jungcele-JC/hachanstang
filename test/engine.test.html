@@ -63,8 +63,8 @@
 <div class="grid" id="dict"></div>
 
 <script type="module">
-import { generateBadge, renderBadgeSVG, matchDeed } from "../js/badge-engine.js";
-import { DICTIONARY, FALLBACKS, PALETTES } from "../js/dictionary.js";
+import { generateBadge, renderBadgeSVG, matchDeed, suggestDeeds } from "../js/badge-engine.js";
+import { DICTIONARY, FALLBACKS, PALETTES, EXAMPLES } from "../js/dictionary.js";
 import { CATEGORIES, CATEGORY_LABEL, RARITIES, RARITY_LABEL } from "../js/contract.js";
 
 const DATE = "2026-10-18";
@@ -123,6 +123,15 @@ check("같은 입력+날짜 → 같은 결과 (id만 다름)", allSame);
 check("사전 입력 20개가 모두 사전 항목에 매칭", dictHit);
 check("SVG: xmlns 포함, 외부 URL 없음", svgOk);
 
+// 규격 v3: SVG는 well-formed XML (share.js가 <img>로 읽음)
+const xmlBad = [];
+for (const [deed] of all) for (const r of RARITIES) {
+  const svg = renderBadgeSVG({ ...generateBadge(deed, DATE), rarity: r });
+  const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+  if (doc.getElementsByTagName("parsererror").length) xmlBad.push(`${deed || "(빈)"}/${r}`);
+}
+check(`SVG가 well-formed XML (입력 30개 × 희귀도 4종)`, xmlBad.length === 0, xmlBad.slice(0, 5).join(", "));
+
 const dateDiff = ["사과 먹음", "이불 갬", "산책"].some((d) => {
   const x = generateBadge(d, "2026-10-18"), y = generateBadge(d, "2026-10-19");
   return x.rarity !== y.rarity || x.description !== y.description;
@@ -158,6 +167,27 @@ check('"사과 한 개 먹음": food면 사전, clean이면 clean fallback',
   apple("food").source === "dictionary" && apple("clean").source === "guess" && apple("clean").category === "clean");
 const unknownOk = ["xyz", undefined, null, ""].every((c) => sameKeys(generateBadge("이불 갬", DATE, c), generateBadge("이불 갬", DATE)));
 check("category가 없거나 모르는 값이면 v1과 같은 결과", unknownOk);
+
+// ---- 규격 v3: suggestDeeds ----
+const exBad = [];
+for (const c of CATEGORIES) for (const d of EXAMPLES[c] ?? []) {
+  const free = matchDeed(d, DATE), fixed = matchDeed(d, DATE, c);
+  if (free.source !== "dictionary" || fixed.source !== "dictionary" || fixed.template.category !== c) exBad.push(`${c}: ${d}`);
+}
+const exCount = CATEGORIES.reduce((a, c) => a + (EXAMPLES[c]?.length ?? 0), 0);
+check(`추천 문장 ${exCount}개가 모두 자기 카테고리 사전에 매칭 (카테고리 인자 있을 때·없을 때)`, exBad.length === 0 && CATEGORIES.every((c) => EXAMPLES[c]?.length >= 3), exBad.join(", "));
+let sugOk = true;
+for (const c of CATEGORIES) {
+  const list = suggestDeeds(c, 3);
+  sugOk &&= Array.isArray(list) && list.length === 3 && new Set(list).size === 3 && list.every((d) => EXAMPLES[c].includes(d));
+}
+const allEx = Object.values(EXAMPLES).flat();
+sugOk &&= suggestDeeds().length === 3 && suggestDeeds().every((d) => allEx.includes(d));
+sugOk &&= suggestDeeds("xyz", 5).length === 5 && suggestDeeds("food", 0).length === 0 && suggestDeeds("food", 999).length === EXAMPLES.food.length;
+check("suggestDeeds: n개 반환, 카테고리 안에서만, 없거나 모르는 값이면 전체에서", sugOk);
+const seen = new Set();
+for (let i = 0; i < 30; i++) seen.add(suggestDeeds("food", 3).join("|"));
+check("suggestDeeds: 부를 때마다 달라짐", seen.size > 1);
 
 // ---- 색 대비 ----
 const lum = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)

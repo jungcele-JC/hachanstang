@@ -2,7 +2,7 @@
 // generateBadge: 입력 한 줄 → Badge (같은 deed+date면 항상 같은 제목·문구·희귀도)
 // renderBadgeSVG: Badge → 메달 SVG 문자열
 import { todayStr, CATEGORIES, RARITIES, RARITY_LABEL } from "./contract.js";
-import { DICTIONARY, CATEGORY_CLUES, FALLBACKS, SPECIALS, PALETTES } from "./dictionary.js";
+import { DICTIONARY, CATEGORY_CLUES, FALLBACKS, SPECIALS, PALETTES, EXAMPLES } from "./dictionary.js";
 
 const RARITY_WEIGHTS = { common: 60, rare: 25, epic: 12, legendary: 3 };
 
@@ -62,7 +62,8 @@ function analyze(raw) {
   const cleaned = raw.normalize("NFC").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").trim();
   const tokens = cleaned ? cleaned.split(/\s+/) : [];
   const stems = tokens.map(stem);
-  return { tokens, stems, orig: tokens.join(""), stem: stems.join("") };
+  // orig는 붙여 쓰기 차이("아침 밥"/"아침밥")를 흡수하고, stem은 띄어 써서 낱말 경계를 넘는 오탐("메일+정리"→"일정")을 막는다
+  return { tokens, stems, orig: tokens.join(""), stem: stems.join(" ") };
 }
 
 const has = (a, part) => a.orig.includes(part) || a.stem.includes(part);
@@ -190,12 +191,31 @@ export function generateBadge(deed, date = todayStr(), category) {
   };
 }
 
+/**
+ * 추천 문장 n개 (규격 v3). 결정적이지 않다 — 부를 때마다 달라진다.
+ * 반환 문장은 그대로 generateBadge에 넣으면 사전 항목에 매칭된다.
+ * @param {import("./contract.js").Category} [category] 주면 그 카테고리 안에서, 없거나 모르는 값이면 전체에서
+ * @param {number} [n=3]
+ * @returns {string[]}
+ */
+export function suggestDeeds(category, n = 3) {
+  const c = validCategory(category);
+  const pool = c ? [...EXAMPLES[c]] : Object.values(EXAMPLES).flat();
+  const count = Math.max(0, Math.min(pool.length, Number.isFinite(n) ? Math.floor(n) : 3));
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, count);
+}
+
 // ------------------------------------------------------------
 // SVG 메달
 // ------------------------------------------------------------
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-const FONT = `system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif`;
-const EMOJI_FONT = `"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+// 속성값이 큰따옴표로 감싸지므로 폰트 이름은 작은따옴표로 (well-formed XML, 규격 v3)
+const FONT = `system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif`;
+const EMOJI_FONT = `'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif`;
 const CX = 120, CY = 100, R = 84;
 
 // 리본 안 제목 글자 크기: 한글·이모지는 1칸, 영문·숫자는 0.6칸으로 셈
