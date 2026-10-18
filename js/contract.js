@@ -1,9 +1,10 @@
 // ============================================================
-// 하찮상 공통 규격 v2  (2026-10-18)
+// 하찮상 공통 규격 v3  (2026-10-18)
 // 3명이 합의한 인터페이스입니다. 바꾸고 싶으면 3명 모두 동의한 뒤
 // C가 수정하고 버전을 올립니다. 다른 사람은 이 파일을 건드리지 않습니다.
 //
 // 변경 이력
+//   v3  suggestDeeds 추가 (A 요청). 뭘 적을지 모를 때 사전에서 추천 문장을 뽑아 화면에 보여줌.
 //   v2  generateBadge에 선택 인자 category 추가 (A 요청). 화면에서 카테고리를 먼저 고르는 흐름 지원.
 //   v1  최초 합의
 // ============================================================
@@ -51,6 +52,11 @@ export function todayStr(d = new Date()) {
 //       category가 없거나(undefined) CATEGORIES에 없는 값이면 지금처럼 엔진이 문장에서 추측.
 //   renderBadgeSVG(badge: Badge, size?: number): string
 //     - <svg …> 문자열. 기본 size 240. 외부 리소스(폰트/이미지 URL) 사용 금지.
+//     - 반드시 well-formed XML이어야 함 (속성값 안에서는 작은따옴표 사용). share.js가 <img>로 읽는다.
+//   suggestDeeds(category?: Category, n?: number): string[]
+//     - 사전 항목에서 "물 한 잔 마심", "이불 갬" 같은 한 일 문장을 n개(기본 3) 골라 반환.
+//     - category가 오면 그 카테고리 안에서, 없으면 전체에서. 결정적일 필요 없음(누를 때마다 달라져도 됨).
+//     - 반환된 문장을 generateBadge에 그대로 넣으면 사전 항목에 매칭되어야 함.
 //
 // js/storage.js  (C 담당)
 //   saveBadge(badge: Badge): void
