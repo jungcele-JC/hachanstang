@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>하찮상 · storage / share 테스트</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+  li { margin: 4px 0; } .pass { color: #1a7f45; } .fail { color: #c0233c; font-weight: 700; }
+  #summary { font-size: 1.2rem; font-weight: 700; margin: 1rem 0; }
+  img { max-width: 100%; border: 1px solid #ccc; border-radius: 8px; }
+  p.note { color: #666; font-size: .9rem; }
+</style>
+</head>
+<body>
+<h1>storage.js / share.js 테스트</h1>
+<p class="note">실행 전에 기존 기록을 내보내 두고, 끝나면 그대로 복원합니다. 콘솔(F12)에 에러가 없어야 합니다.</p>
+<div id="summary">실행 중…</div>
+<ol id="results"></ol>
+<h2>badgeToPNG 결과</h2>
+<img id="png" alt="공유 카드 미리보기" />
+
+<script type="module">
+import { saveBadge, listBadges, deleteBadge, getStats, exportJSON, importJSON, clearAll, calcStreak, shiftDay } from "../js/storage.js";
+import { generateBadge } from "../js/badge-engine.js";
+import { badgeToPNG } from "../js/share.js";
+import { todayStr } from "../js/contract.js";
+
+const out = document.getElementById("results");
+let pass = 0, fail = 0;
+function check(name, cond, detail = "") {
+  const li = document.createElement("li");
+  li.className = cond ? "pass" : "fail";
+  li.textContent = `${cond ? "PASS" : "FAIL"} · ${name}${detail ? " — " + detail : ""}`;
+  out.appendChild(li);
+  cond ? pass++ : fail++;
+}
+
+const backup = exportJSON();
+try {
+  clearAll();
+  check("비운 뒤 목록이 비어 있음", listBadges().length === 0);
+
+  // 저장 5개 (createdAt을 1초씩 다르게)
+  const made = [];
+  for (let i = 0; i < 5; i++) {
+    const b = generateBadge(`테스트 ${i}`);
+    b.createdAt = new Date(Date.now() - (5 - i) * 1000).toISOString();
+    saveBadge(b); made.push(b);
+  }
+  check("저장 5개 → 총 5개", listBadges().length === 5);
+  check("목록이 최신순", listBadges()[0].id === made[4].id);
+
+  // 같은 id 재저장은 교체
+  saveBadge({ ...made[0], title: "교체됨" });
+  check("같은 id 저장은 교체(개수 유지)", listBadges().length === 5 && listBadges().find((b) => b.id === made[0].id).title === "교체됨");
+
+  // 삭제
+  deleteBadge(made[1].id);
+  check("삭제 후 4개", listBadges().length === 4 && !listBadges().some((b) => b.id === made[1].id));
+
+  // 통계
+  const s = getStats();
+  check("total == 4", s.total === 4);
+  check("byCategory 키 8개 전부 존재", Object.keys(s.byCategory).length === 8);
+  check("byRarity 키 4개 전부 존재", Object.keys(s.byRarity).length === 4);
+  check("오늘 뱃지 있음 → streak 1", s.streak === 1, `streak=${s.streak}`);
+
+  // streak: 오늘·어제·3일 전 → 2
+  const t = todayStr();
+  const sample = [{ date: t }, { date: shiftDay(t, -1) }, { date: shiftDay(t, -3) }];
+  check("streak 오늘·어제·3일전 → 2", calcStreak(sample) === 2, `=${calcStreak(sample)}`);
+  check("streak 어제만 → 1 (어제까지 인정)", calcStreak([{ date: shiftDay(t, -1) }]) === 1);
+  check("streak 2일 전만 → 0", calcStreak([{ date: shiftDay(t, -2) }]) === 0);
+  check("streak 월말 넘김", calcStreak([{ date: "2026-03-01" }, { date: "2026-02-28" }, { date: "2026-02-27" }], "2026-03-01") === 3);
+
+  // 내보내기 → 비우기 → 가져오기
+  const json = exportJSON();
+  clearAll();
+  check("비운 뒤 0개", listBadges().length === 0);
+  const added = importJSON(json);
+  check("가져오기 → 4개 추가 반환", added === 4, `added=${added}`);
+  check("가져온 뒤 목록 4개", listBadges().length === 4);
+  check("중복 가져오기는 0", importJSON(json) === 0);
+  check("형식 틀린 항목은 건너뜀", importJSON(JSON.stringify([{ id: "x" }, { hello: 1 }])) === 0);
+
+  // 새로고침 유지 (localStorage에 실제로 들어갔는지)
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem("hachanstang.badges.v1")); } catch {}
+  check("localStorage에 version 1 형식으로 저장", raw && raw.version === 1 && raw.badges.length === 4);
+
+  // PNG
+  const blob = await badgeToPNG(listBadges()[0]);
+  check("badgeToPNG → image/png Blob", blob instanceof Blob && blob.type === "image/png" && blob.size > 10_000, `${blob.size} bytes`);
+  document.getElementById("png").src = URL.createObjectURL(blob);
+} catch (err) {
+  check("예외 없이 끝남", false, String(err));
+  console.error(err);
+} finally {
+  clearAll();
+  importJSON(backup);
+}
+document.getElementById("summary").textContent = `${pass} PASS / ${fail} FAIL`;
+document.getElementById("summary").className = fail ? "fail" : "pass";
+window.__testDone = { pass, fail };
+</script>
+</body>
+</html>
