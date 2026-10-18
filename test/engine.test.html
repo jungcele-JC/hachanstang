@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>뱃지 엔진 테스트 — 하찮상</title>
+<style>
+  :root { --bg: #fafaf7; --fg: #1d1d1b; --muted: #6b6a63; --line: #e3e1d8; --pass: #1e7b3c; --fail: #b3261e; --card: #fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161614; --fg: #ecebe6; --muted: #a09e95; --line: #34332e; --pass: #6fd08c; --fail: #ff8a80; --card: #201f1c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 28px 0 8px; }
+  .muted { color: var(--muted); }
+  .summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .chip { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); }
+  .pass { color: var(--pass); font-weight: 700; }
+  .fail { color: var(--fail); font-weight: 700; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 760px; background: var(--card); }
+  th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: middle; }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; }
+  td.deed { max-width: 220px; word-break: break-all; }
+  td svg { display: block; }
+  .src { font-size: 12px; color: var(--muted); }
+  .boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .board { padding: 12px; border-radius: 12px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .board.light { background: #ffffff; border: 1px solid #ddd; }
+  .board.dark { background: #111111; }
+  .board figure { margin: 0; text-align: center; font-size: 12px; }
+  .board.light figure { color: #333; }
+  .board.dark figure { color: #ddd; }
+  .grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .grid figure { margin: 0; width: 104px; text-align: center; font-size: 11px; color: var(--muted); }
+  ul.checks { padding-left: 18px; }
+</style>
+</head>
+<body>
+<h1>뱃지 엔진 테스트</h1>
+<p class="muted">js/badge-engine.js · js/dictionary.js — 정적 서버로 열어 주세요 (file:// 에서는 ES module이 안 열립니다).</p>
+
+<div class="summary" id="summary"></div>
+<ul class="checks" id="checks"></ul>
+
+<h2>입력 30개 (사전 20 + 사전 밖 10)</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>입력</th><th>메달</th><th>제목</th><th>카테고리</th><th>희귀도</th><th>문구</th><th>해석</th><th>결정성</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table></div>
+
+<h2>희귀도 4종 × 라이트/다크 배경</h2>
+<div class="boards">
+  <div class="board light" id="light"></div>
+  <div class="board dark" id="dark"></div>
+</div>
+
+<h2>카테고리 8종 색 (fallback)</h2>
+<div class="grid" id="cats"></div>
+
+<h2>사전 전체 <span class="muted" id="dictCount"></span></h2>
+<div class="grid" id="dict"></div>
+
+<script type="module">
+import { generateBadge, renderBadgeSVG, matchDeed } from "../js/badge-engine.js";
+import { DICTIONARY, FALLBACKS, PALETTES } from "../js/dictionary.js";
+import { CATEGORIES, CATEGORY_LABEL, RARITIES, RARITY_LABEL } from "../js/contract.js";
+
+const DATE = "2026-10-18";
+const IN_DICT = [
+  "사과 한 개 먹음", "물 한 잔 마심", "사진 37장 지움", "이불 갬", "설거지 했다",
+  "동네 산책함", "답장 하나 보냄", "일찍 잤다", "쓰레기 버렸음", "화분에 물 줬어요",
+  "양치 꼼꼼히 함", "알람 끄고 바로 일어남", "계단으로 올라감", "책 10페이지 읽음", "메일함 정리했다",
+  "스트레칭 5분", "엄마한테 전화함", "빨래 개기 완료", "커피 마셨어요", "낮잠 잤음",
+];
+const LONG = "오늘은 아침부터 이것저것 하려고 마음을 먹었지만 결국 침대 위에서 천장을 바라보며 이런저런 생각을 하다가 점심이 되었고 점심 이후에도 별다른 일 없이 창밖을 보며 시간을 보냈는데 그래도 저녁쯤에는 무언가 해야겠다는 생각이 들어서 결국 내일 할 일을 머릿속으로 한 번 정리해 보았다는 아주 긴 이야기입니다 끝";
+const OUT_DICT = [
+  "", "아무것도 안 함", "I finally replied to Sam", "🍕✨", LONG,
+  "볼펜 뚜껑 닫음", "우산 챙겨 나감", "종이비행기 접음", "모기 한 마리 잡음", "라디오에 사연 보냄",
+];
+
+const el = (id) => document.getElementById(id);
+const checks = [];
+const check = (name, ok, detail = "") => checks.push({ name, ok, detail });
+const note = (name, detail = "") => checks.push({ name, ok: true, info: true, detail });
+const KEYS = ["title", "description", "category", "rarity", "icon"];
+
+function validBadge(b) {
+  const str = (v) => typeof v === "string" && v.length > 0;
+  return str(b.id) && /^\d{4}-\d{2}-\d{2}$/.test(b.date) && typeof b.deed === "string" &&
+    str(b.title) && str(b.description) && CATEGORIES.includes(b.category) && RARITIES.includes(b.rarity) &&
+    str(b.icon) && b.palette && ["bg", "fg", "accent"].every((k) => /^#[0-9a-f]{6}$/i.test(b.palette[k])) &&
+    !Number.isNaN(Date.parse(b.createdAt));
+}
+
+// ---- 30개 입력 ----
+const all = [...IN_DICT.map((d) => [d, true]), ...OUT_DICT.map((d) => [d, false])];
+let allValid = true, allSame = true, dictHit = true, svgOk = true;
+el("rows").innerHTML = all.map(([deed, expectDict], i) => {
+  const a = generateBadge(deed, DATE);
+  const b = generateBadge(deed, DATE);
+  const m = matchDeed(deed, DATE);
+  const same = KEYS.every((k) => a[k] === b[k]) && JSON.stringify(a.palette) === JSON.stringify(b.palette) && a.id !== b.id;
+  const svg = renderBadgeSVG(a, 72);
+  allValid &&= validBadge(a);
+  allSame &&= same;
+  if (expectDict && m.source !== "dictionary") dictHit = false;
+  svgOk &&= svg.startsWith("<svg") && svg.includes('xmlns="http://www.w3.org/2000/svg"') && !/(href|url\()\s*=?\s*["']?(https?:)?\/\//.test(svg);
+  const shown = deed.length > 40 ? deed.slice(0, 40) + `… (${deed.length}자)` : deed === "" ? "(빈 문자열)" : deed;
+  return `<tr>
+    <td>${i + 1}</td><td class="deed">${escapeHTML(shown)}</td><td>${svg}</td><td><b>${escapeHTML(a.title)}</b></td>
+    <td>${CATEGORY_LABEL[a.category]}</td><td>${RARITY_LABEL[a.rarity]}</td><td class="desc">${escapeHTML(a.description)}</td>
+    <td class="src">${m.source}${m.keyword ? ` · "${m.keyword}"` : ""}</td>
+    <td class="${same ? "pass" : "fail"}">${same ? "PASS" : "FAIL"}</td>
+  </tr>`;
+}).join("");
+
+function escapeHTML(s) { return String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`); }
+
+check("입력 30개 모두 규격에 맞는 뱃지 생성", allValid);
+check("같은 입력+날짜 → 같은 결과 (id만 다름)", allSame);
+check("사전 입력 20개가 모두 사전 항목에 매칭", dictHit);
+check("SVG: xmlns 포함, 외부 URL 없음", svgOk);
+
+const dateDiff = ["사과 먹음", "이불 갬", "산책"].some((d) => {
+  const x = generateBadge(d, "2026-10-18"), y = generateBadge(d, "2026-10-19");
+  return x.rarity !== y.rarity || x.description !== y.description;
+});
+check("날짜가 바뀌면 희귀도·문구가 달라질 수 있음", dateDiff);
+
+const variety = new Set();
+for (let d = 1; d <= 20; d++) variety.add(generateBadge("물 한 잔 마심", `2026-10-${String(d).padStart(2, "0")}`).title);
+check(`같은 행동의 여러 뱃지가 날짜별로 번갈아 나옴 ("물 한 잔 마심" → ${[...variety].join(", ")})`, variety.size >= 2);
+
+let noArg = true;
+try { noArg = validBadge(generateBadge(undefined)) && validBadge(generateBadge(null)) && validBadge(generateBadge("사과")); } catch { noArg = false; }
+check("deed가 undefined/null이거나 date가 생략돼도 뱃지 생성", noArg);
+
+check(`사전 항목 80개 이상 (현재 ${DICTIONARY.length}개)`, DICTIONARY.length >= 80);
+const badEntries = DICTIONARY.filter((e) => !CATEGORIES.includes(e.category) || !e.icon || !e.title || !e.keywords?.length || !e.descriptions?.length || (e.minRarity && !RARITIES.includes(e.minRarity)));
+check("사전 항목 필드 형식", badEntries.length === 0, badEntries.map((e) => e.title).join(", "));
+const longTitles = DICTIONARY.filter((e) => { const n = e.title.replace(/\s/g, "").length; return n < 2 || n > 8; });
+if (longTitles.length) note(`제목 2~8자 권장 — 넘는 제목 ${longTitles.length}개 (메달 글씨는 자동 축소)`, longTitles.map((e) => e.title).join(", "));
+check("fallback 템플릿이 모든 카테고리에 있음", CATEGORIES.every((c) => FALLBACKS[c]?.titles?.length && FALLBACKS[c]?.descriptions?.length && FALLBACKS[c]?.icons?.length));
+
+// 희귀도 분포 (가중치 60/25/12/3 근처인지)
+const counts = Object.fromEntries(RARITIES.map((r) => [r, 0]));
+for (let i = 0; i < 4000; i++) counts[generateBadge(`하찮은 일 ${i}`, DATE).rarity]++;
+const pct = (r) => Math.round((counts[r] / 4000) * 100);
+check(`희귀도 분포 ${RARITIES.map((r) => `${RARITY_LABEL[r]} ${pct(r)}%`).join(" / ")}`,
+  Math.abs(pct("common") - 60) <= 4 && Math.abs(pct("rare") - 25) <= 4 && Math.abs(pct("epic") - 12) <= 3 && Math.abs(pct("legendary") - 3) <= 2);
+
+// ---- 희귀도 보드 ----
+const base = generateBadge("알람 끄고 바로 일어남", DATE);
+const boards = RARITIES.map((r) => `<figure>${renderBadgeSVG({ ...base, rarity: r }, 128)}<figcaption>${RARITY_LABEL[r]}</figcaption></figure>`).join("");
+el("light").innerHTML = boards;
+el("dark").innerHTML = boards;
+
+// ---- 카테고리 ----
+el("cats").innerHTML = CATEGORIES.map((c) => {
+  const b = { ...generateBadge("카테고리 미리보기", DATE), category: c, title: FALLBACKS[c].titles[0], icon: FALLBACKS[c].icons[0], rarity: "common", palette: PALETTES[c] };
+  return `<figure>${renderBadgeSVG(b, 96)}<figcaption>${CATEGORY_LABEL[c]}</figcaption></figure>`;
+}).join("");
+
+// ---- 사전 전체 ----
+el("dictCount").textContent = `(${DICTIONARY.length}개)`;
+el("dict").innerHTML = DICTIONARY.map((e) => {
+  const b = { ...generateBadge(e.keywords[0], DATE), title: e.title, icon: e.icon, category: e.category, palette: PALETTES[e.category], rarity: e.minRarity || "common" };
+  return `<figure title="${escapeHTML(e.keywords.join(", "))}">${renderBadgeSVG(b, 96)}<figcaption>${escapeHTML(e.keywords[0])}</figcaption></figure>`;
+}).join("");
+
+// ---- 요약 ----
+const tests = checks.filter((c) => !c.info);
+const passed = tests.filter((c) => c.ok).length;
+el("summary").innerHTML = `<span class="chip ${passed === tests.length ? "pass" : "fail"}">${passed} / ${tests.length} PASS</span>`;
+el("checks").innerHTML = checks.map((c) => `<li><span class="${c.info ? "muted" : c.ok ? "pass" : "fail"}">${c.info ? "참고" : c.ok ? "PASS" : "FAIL"}</span> ${escapeHTML(c.name)}${c.detail ? ` <span class="muted">— ${escapeHTML(c.detail)}</span>` : ""}</li>`).join("");
+console.log(`[engine.test] ${passed}/${tests.length} PASS`);
+</script>
+</body>
+</html>
