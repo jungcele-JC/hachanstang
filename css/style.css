@@ -1,0 +1,3 @@
+/* A가 소유. 임시 스타일. */
+body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
+#collection svg { margin: 4px; }
