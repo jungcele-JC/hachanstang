@@ -3,20 +3,108 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
   <title>하찮상</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <!-- A가 이 파일과 css/style.css, js/app.js를 소유합니다. 아래는 mock이 돌아가는지 확인용 최소 화면. -->
+  <!-- A 소유: index.html, css/style.css, js/app.js. 화면 전환은 URL hash(#home, #award, #collection). -->
+  <header class="top">
+    <a class="brand" href="#home">🏅 하찮상</a>
+  </header>
+
   <main id="app">
-    <h1>하찮상</h1>
-    <form id="deed-form">
-      <input id="deed" placeholder="오늘 한 하찮은 일 (예: 사과 먹음)" required />
-      <button>업적 받기</button>
-    </form>
-    <section id="result"></section>
-    <section id="collection"></section>
+
+    <!-- 1. 입력 -->
+    <section id="home" class="screen" aria-labelledby="home-title" hidden>
+      <h1 id="home-title" class="screen-title" tabindex="-1">오늘 어떤 하찮은 일을<br />하셨나요?</h1>
+
+      <form id="deed-form" novalidate>
+        <fieldset class="step">
+          <legend><span class="step-no">1</span> 어떤 종류의 일인가요?</legend>
+          <div id="category-chips" class="chips" role="radiogroup" aria-label="카테고리"></div>
+        </fieldset>
+
+        <div class="step">
+          <label for="deed"><span class="step-no">2</span> 한 줄로 적어 주세요</label>
+          <div class="input-row">
+            <input id="deed" name="deed" type="text" maxlength="200" autocomplete="off" enterkeyhint="done" placeholder="사과 먹음" />
+          </div>
+          <p id="deed-hint" class="hint" aria-live="polite">카테고리를 먼저 골라 주세요.</p>
+        </div>
+
+        <button id="submit-btn" class="btn btn-primary btn-big" type="submit" disabled>업적 받기</button>
+      </form>
+
+      <section id="today" class="today" aria-labelledby="today-title" hidden>
+        <h2 id="today-title" class="sub-title">오늘 받은 업적</h2>
+        <ul id="today-list" class="mini-grid"></ul>
+      </section>
+    </section>
+
+    <!-- 2. 수여 -->
+    <section id="award" class="screen" aria-labelledby="award-title" hidden>
+      <p class="award-kicker">업적 달성</p>
+      <div id="medal" class="medal" aria-hidden="true"></div>
+      <h1 id="award-title" class="award-name" tabindex="-1"></h1>
+      <p id="award-desc" class="award-desc"></p>
+      <p class="award-meta"><span id="award-rarity" class="rarity"></span> <span id="award-date"></span></p>
+      <p id="award-deed" class="award-deed"></p>
+      <div class="actions">
+        <button id="save-btn" class="btn btn-primary btn-big" type="button">컬렉션에 보관</button>
+        <button id="image-btn" class="btn btn-big" type="button">이미지로 저장</button>
+        <a class="btn btn-ghost btn-big" href="#home">다른 일 적기</a>
+      </div>
+    </section>
+
+    <!-- 3. 컬렉션 -->
+    <section id="collection" class="screen" aria-labelledby="collection-title" hidden>
+      <h1 id="collection-title" class="screen-title" tabindex="-1">쌓이는 하찮음</h1>
+
+      <div class="stats">
+        <div class="stat"><span id="stat-total" class="stat-num">0</span><span class="stat-label">총 업적</span></div>
+        <div class="stat"><span id="stat-streak" class="stat-num">0</span><span class="stat-label">연속 일수</span></div>
+      </div>
+      <ul id="stat-categories" class="cat-bars" aria-label="카테고리 분포"></ul>
+
+      <div id="badge-groups" class="groups"></div>
+      <p id="empty-collection" class="empty" hidden>아직 받은 업적이 없어요.<br /><a href="#home">첫 하찮은 일 적으러 가기</a></p>
+
+      <details class="settings">
+        <summary>내보내기 · 가져오기</summary>
+        <div class="settings-body">
+          <button id="export-btn" class="btn" type="button">JSON으로 내보내기</button>
+          <label class="btn file-btn">가져오기<input id="import-input" type="file" accept=".json,application/json" /></label>
+          <p class="hint">내보낸 파일을 다른 기기에서 가져오면 업적이 합쳐져요. 같은 업적은 중복으로 들어가지 않아요.</p>
+        </div>
+      </details>
+    </section>
   </main>
+
+  <nav class="tabbar" aria-label="화면 이동">
+    <a href="#home" data-tab="home">✍️ <span>적기</span></a>
+    <a href="#collection" data-tab="collection">🗂️ <span>컬렉션</span></a>
+  </nav>
+
+  <!-- 뱃지 상세 -->
+  <dialog id="detail" class="detail" aria-labelledby="detail-title">
+    <div class="detail-top">
+      <div id="detail-medal" class="detail-medal" aria-hidden="true"></div>
+      <h2 id="detail-title" class="award-name"></h2>
+      <p id="detail-desc" class="award-desc"></p>
+      <p class="award-meta"><span id="detail-rarity" class="rarity"></span> <span id="detail-date"></span></p>
+      <p id="detail-deed" class="award-deed"></p>
+    </div>
+    <div class="detail-actions">
+      <button id="detail-delete" class="btn btn-danger" type="button">삭제</button>
+      <button id="detail-confirm" class="btn btn-danger" type="button" hidden>정말 삭제</button>
+      <button id="detail-cancel" class="btn" type="button" hidden>취소</button>
+      <button id="detail-close" class="btn btn-ghost" type="button">닫기</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
