@@ -957,14 +957,16 @@ export const SPECIALS = {
   },
 };
 
-// 카테고리별 고정 색. 밝은 bg 위 진한 fg (대비 4.5:1 이상), accent는 테두리용.
+// 카테고리별 고정 색. bg는 A와 맞춘 봄 파스텔 5색(화면 칩 색과 같은 짝),
+// fg는 진한 색(bg 대비 7.7:1 이상), accent는 테두리·리본 끝용.
+//   먹기·사람=핑크 / 정리·디지털=아쿠아 / 움직임=라임 / 휴식=민트 / 일·공부·기타=골드
 export const PALETTES = {
-  food:    { bg: "#FFF1E6", fg: "#5A2E0C", accent: "#F28C28" },
-  clean:   { bg: "#EAF7EE", fg: "#0F4A2A", accent: "#3DAA6A" },
-  digital: { bg: "#E8F0FE", fg: "#102A5C", accent: "#3B6FE0" },
-  move:    { bg: "#FDE8EC", fg: "#5A0F1F", accent: "#E0485E" },
-  social:  { bg: "#F3E9FB", fg: "#3B1660", accent: "#8B4FD1" },
-  rest:    { bg: "#E9ECFB", fg: "#1E2560", accent: "#5B6CD6" },
-  work:    { bg: "#E3F6F4", fg: "#0B3F3A", accent: "#1F9C8E" },
-  etc:     { bg: "#F2F1EC", fg: "#2E2E2A", accent: "#8A8778" },
+  food:    { bg: "#FFD6E0", fg: "#6B1530", accent: "#E8577E" },
+  social:  { bg: "#FFD6E0", fg: "#4A1A5C", accent: "#B565D9" },
+  clean:   { bg: "#90F1EF", fg: "#0B4A49", accent: "#16A6A1" },
+  digital: { bg: "#90F1EF", fg: "#102A5C", accent: "#3B6FE0" },
+  move:    { bg: "#C1FBA4", fg: "#1F4A0A", accent: "#52A82A" },
+  rest:    { bg: "#7BF1A8", fg: "#0B4026", accent: "#1A9457" },
+  work:    { bg: "#FFEF9F", fg: "#4A3A00", accent: "#D4A017" },
+  etc:     { bg: "#FFEF9F", fg: "#3A3530", accent: "#A08A4A" },
 };

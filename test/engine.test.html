@@ -137,6 +137,36 @@ let noArg = true;
 try { noArg = validBadge(generateBadge(undefined)) && validBadge(generateBadge(null)) && validBadge(generateBadge("사과")); } catch { noArg = false; }
 check("deed가 undefined/null이거나 date가 생략돼도 뱃지 생성", noArg);
 
+// ---- 규격 v2: category 인자 ----
+const sameKeys = (x, y) => KEYS.every((k) => x[k] === y[k]);
+const catInputs = ["사과 한 개 먹음", "이불 갬", "", "🍕", "I made my bed", "모기 한 마리 잡음", "알람 끄고 바로 일어남"];
+let catFixed = true, catSame = true, catInside = true;
+for (const c of CATEGORIES) {
+  for (const d of catInputs) {
+    const x = generateBadge(d, DATE, c), y = generateBadge(d, DATE, c);
+    catFixed &&= x.category === c && validBadge(x) && JSON.stringify(x.palette) === JSON.stringify(PALETTES[c]);
+    catSame &&= sameKeys(x, y);
+    const m = matchDeed(d, DATE, c);
+    if (m.source === "dictionary") catInside &&= m.template.category === c;
+  }
+}
+check("category를 주면 결과 category·색이 그 값 (8종 × 입력 7개)", catFixed);
+check("같은 deed+date+category → 같은 결과", catSame);
+check("category를 주면 그 카테고리 사전 항목에서만 매칭", catInside);
+const apple = (c) => matchDeed("사과 한 개 먹음", DATE, c);
+check('"사과 한 개 먹음": food면 사전, clean이면 clean fallback',
+  apple("food").source === "dictionary" && apple("clean").source === "guess" && apple("clean").category === "clean");
+const unknownOk = ["xyz", undefined, null, ""].every((c) => sameKeys(generateBadge("이불 갬", DATE, c), generateBadge("이불 갬", DATE)));
+check("category가 없거나 모르는 값이면 v1과 같은 결과", unknownOk);
+
+// ---- 색 대비 ----
+const lum = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+  .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+  .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+const lowContrast = CATEGORIES.filter((c) => ratio(PALETTES[c].fg, PALETTES[c].bg) < 4.5);
+check(`fg/bg 대비 4.5:1 이상 (최소 ${Math.min(...CATEGORIES.map((c) => ratio(PALETTES[c].fg, PALETTES[c].bg))).toFixed(1)}:1)`, lowContrast.length === 0, lowContrast.join(", "));
+
 check(`사전 항목 80개 이상 (현재 ${DICTIONARY.length}개)`, DICTIONARY.length >= 80);
 const badEntries = DICTIONARY.filter((e) => !CATEGORIES.includes(e.category) || !e.icon || !e.title || !e.keywords?.length || !e.descriptions?.length || (e.minRarity && !RARITIES.includes(e.minRarity)));
 check("사전 항목 필드 형식", badEntries.length === 0, badEntries.map((e) => e.title).join(", "));

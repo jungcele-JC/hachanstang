@@ -1,7 +1,7 @@
 // 하찮상 뱃지 엔진 (B 담당)
 // generateBadge: 입력 한 줄 → Badge (같은 deed+date면 항상 같은 제목·문구·희귀도)
 // renderBadgeSVG: Badge → 메달 SVG 문자열
-import { todayStr, RARITIES, RARITY_LABEL } from "./contract.js";
+import { todayStr, CATEGORIES, RARITIES, RARITY_LABEL } from "./contract.js";
 import { DICTIONARY, CATEGORY_CLUES, FALLBACKS, SPECIALS, PALETTES } from "./dictionary.js";
 
 const RARITY_WEIGHTS = { common: 60, rare: 25, epic: 12, legendary: 3 };
@@ -77,10 +77,12 @@ const ENTRIES = DICTIONARY.map((entry) => ({
 }));
 
 // 가장 긴 키워드로 맞은 항목을 찾는다. 같은 길이가 여럿이면 seed 해시로 하나를 고른다.
-function findEntry(a, seed) {
+// category가 있으면 그 카테고리 항목만 본다.
+function findEntry(a, seed, category) {
   let bestLen = 0;
   let ties = [];
   for (const { entry, keywords } of ENTRIES) {
+    if (category && entry.category !== category) continue;
     let hit = null;
     for (const k of keywords) {
       if (k.len >= bestLen && (!hit || k.len > hit.len) && k.parts.every((p) => has(a, p))) hit = k;
@@ -108,29 +110,38 @@ function firstEmoji(raw) {
       if (/\p{Extended_Pictographic}/u.test(segment)) return segment;
     }
   }
-  return raw.match(/\p{Extended_Pictographic}️?/u)[0];
+  return raw.match(/\p{Extended_Pictographic}\uFE0F?/u)[0];
 }
+
+const validCategory = (c) => (CATEGORIES.includes(c) ? c : undefined);
+// 카테고리 없이 부르면 v1과 같은 seed → 기존 결과가 그대로 유지된다
+const seedOf = (raw, date, category) => (category ? `${raw}|${date}|${category}` : `${raw}|${date}`);
 
 /**
  * 입력이 어떻게 해석되는지 알려준다(테스트·사전 보강용).
+ * @param {string} deed
+ * @param {string} [date]
+ * @param {string} [category] 주면 그 카테고리 안에서만 찾는다. 모르는 값은 무시.
  * @returns {{source:"dictionary"|"guess"|"empty"|"emoji"|"latin", keyword?:string, category:string, template:object}}
  */
-export function matchDeed(deed, date = todayStr()) {
+export function matchDeed(deed, date = todayStr(), category) {
   const raw = typeof deed === "string" ? deed : String(deed ?? "");
+  const fixed = validCategory(category);
   const a = analyze(raw);
-  const found = findEntry(a, `${raw}|${date}`);
+  const found = findEntry(a, seedOf(raw, date, fixed), fixed);
   if (found) return { source: "dictionary", keyword: found.keyword, category: found.entry.category, template: found.entry };
 
   if (!a.orig) {
     const emoji = firstEmoji(raw);
-    if (emoji) return { source: "emoji", category: "etc", template: { ...SPECIALS.emoji, icon: emoji } };
-    return { source: "empty", category: "etc", template: SPECIALS.empty };
+    if (emoji) return { source: "emoji", category: fixed ?? "etc", template: { ...SPECIALS.emoji, icon: emoji } };
+    return { source: "empty", category: fixed ?? "etc", template: SPECIALS.empty };
   }
-  const category = guessCategory(a);
-  if (category === "etc" && /[a-z]/.test(a.orig) && !/[가-힣]/.test(a.orig)) {
+  if (fixed) return { source: "guess", category: fixed, template: FALLBACKS[fixed] };
+  const guessed = guessCategory(a);
+  if (guessed === "etc" && /[a-z]/.test(a.orig) && !/[\uac00-\ud7a3]/.test(a.orig)) {
     return { source: "latin", category: "etc", template: SPECIALS.latin };
   }
-  return { source: "guess", category, template: FALLBACKS[category] };
+  return { source: "guess", category: guessed, template: FALLBACKS[guessed] };
 }
 
 function rollRarity(seed, minRarity) {
@@ -158,22 +169,23 @@ function uuid() {
 /**
  * @param {string} deed
  * @param {string} [date] "YYYY-MM-DD"
+ * @param {import("./contract.js").Category} [category] 화면에서 고른 카테고리 (규격 v2)
  * @returns {import("./contract.js").Badge}
  */
-export function generateBadge(deed, date = todayStr()) {
+export function generateBadge(deed, date = todayStr(), category) {
   const raw = typeof deed === "string" ? deed : String(deed ?? "");
-  const seed = `${raw}|${date}`;
-  const { category, template: t } = matchDeed(raw, date);
+  const seed = seedOf(raw, date, validCategory(category));
+  const { category: cat, template: t } = matchDeed(raw, date, category);
   return {
     id: uuid(),
     date,
     deed: raw,
     title: t.title ?? pick(t.titles, seed + "#title"),
     description: pick(t.descriptions, seed + "#desc"),
-    category,
+    category: cat,
     rarity: rollRarity(seed, t.minRarity),
     icon: t.icon ?? pick(t.icons, seed + "#icon"),
-    palette: { ...PALETTES[category] },
+    palette: { ...PALETTES[cat] },
     createdAt: new Date().toISOString(),
   };
 }
@@ -189,7 +201,7 @@ const CX = 120, CY = 100, R = 84;
 // 리본 안 제목 글자 크기: 한글·이모지는 1칸, 영문·숫자는 0.6칸으로 셈
 function titleFontSize(title) {
   let units = 0;
-  for (const ch of title) units += /[\u0000-ɏ]/.test(ch) ? (ch === " " ? 0.35 : 0.6) : 1;
+  for (const ch of title) units += /[\u0000-\u024f]/.test(ch) ? (ch === " " ? 0.35 : 0.6) : 1;
   return Math.max(9, Math.min(19, 168 / Math.max(units, 1)));
 }
 
